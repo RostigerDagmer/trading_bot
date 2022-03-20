@@ -115,11 +115,13 @@ class Bot:
         self.capital = self.api.funds
         self.open_positions = {}
         self.timezone = tz.tzlocal()
+        '''
         self.record = record
         self.data_dir = None
         self.filename = None
         if self.record:
             self.data_dir = self.find_data_dir()
+        '''
     
     def find_data_dir(self):
         cwd = os.getcwd()
@@ -130,13 +132,13 @@ class Bot:
             sys.exit(1)
         data_path = os.path.join(cwd, "tmp")
         self.data_dir = data_path
-
+    '''
     def write_data(self):
         if not self.data_dir:
             self.find_data_dir()
         if not self.filename:
             self.filename = datetime.now().strftime("%Y_%m_%d_%H-%M-%S") + "_bot_data.log"
-        
+    '''
 
     def init_ema(self):
         for strategy, (timestep, window_low, window_high) in self.strategies.items():
@@ -170,9 +172,6 @@ class Bot:
 
             for t in threads:
                 t.join()
-
-            if self.record:
-                self.write_data()
             #####################################
             toc = time.time()
             
