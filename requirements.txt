@@ -1,0 +1,7 @@
+tables
+numpy
+dotenv
+ciso8601
+pandas
+matplotlib
+mplfinance
