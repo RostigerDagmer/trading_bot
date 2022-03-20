@@ -1,7 +1,8 @@
 tables
 numpy
-dotenv
+python-dotenv
 ciso8601
 pandas
 matplotlib
 mplfinance
+scikit-optimize
