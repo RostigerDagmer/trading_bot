@@ -18,6 +18,8 @@ import time
 import pytz
 from log import initLogger
 import logging
+import platform
+import signal
 
 API_KEY = '8e26e098-6e2f-4275-818b-6fc64e2c15a0'
 url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest'
@@ -117,7 +119,10 @@ def live_mocktrade(params):
     try:
         api_thread.start()
         bot_thread.start()
-        os.system("pause")
+        if platform.system() == "Windows":
+            os.system("pause")
+        elif platform.system() == "Linux":
+            signal.pause()
     except (KeyboardInterrupt, SystemExit):
         print('BYEEEEEEEE! BYEBYEYY!')
         api_thread.stop()
