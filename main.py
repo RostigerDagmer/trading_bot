@@ -90,7 +90,7 @@ def live_mocktrade(params):
 
     threads = []
 
-    optional_get = lambda d, k, v: d.get(k) if d.get(k) else v
+    optional_get = lambda d, k, v: v if not d else d.get(k) if d.get(k) else v
 
     timestep = optional_get(params, 'timestep', 13)
     window_l = optional_get(params, 'window_low', 2)
@@ -138,7 +138,8 @@ def main():
     
     flags = parser.parse_args()
     params = flags.ema_params
-    params = dict([(p.split('=')[0], int(p.split('=')[1])) for p in params])
+    if params:
+        params = dict([(p.split('=')[0], int(p.split('=')[1])) for p in params])
     if flags.t:
         test()
     elif flags.o:

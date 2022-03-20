@@ -7,3 +7,4 @@ matplotlib
 mplfinance
 scikit-optimize
 pyswarms
+bokeh
