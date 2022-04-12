@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 from dateutil import tz
 import time
 import pytz
-from log import initLogger
+from log import initLogger, Database
 import logging
 import platform
 import signal
@@ -27,8 +27,11 @@ url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest'
 initLogger()
 LOG = logging.getLogger('root')
 
-def test():
-    for t in tests:
+def test(params):
+    tests_ = tests
+    if params:
+        tests_ = {k: v for k, v in tests_.items() if k in params}
+    for t in tests_:
         separator = 'testing-----------------------------------------------'
         separator = separator[:len(separator) - len(t)] + t + "()"
         print(separator)
@@ -41,10 +44,15 @@ def optimize():
     #params = swarm_on_history()
     print(f'Parameters found: {params}')
 
-def plot():
+def plot(params):
+    optional_get = lambda d, k, v: v if not d else d.get(k) if d.get(k) else v
+
+    timestep = optional_get(params, 'timestep', 13)
+    window_l = optional_get(params, 'window_low', 2)
+    window_h = optional_get(params, 'window_high', 24)
     api = MockAPI(datapath='data/Bitstamp_ETHUSD_2021_minute.csv', readlines=613813)
     #animate_mocktrade(api, 13, 2, 24, True)
-    ema_plot(api, 13, 2, 24)
+    ema_plot(api, timestep, window_l, window_h)
 
 def p1():
     load_dotenv(find_dotenv())
@@ -98,11 +106,12 @@ def live_mocktrade(params):
     window_l = optional_get(params, 'window_low', 2)
     window_h = optional_get(params, 'window_high', 24)
 
+    db = Database()
+
     LOG.info('creating API thread...')
 
     api = FtxAPI(api_key, api_secret)
     api.init_history(timestep=timestep, length=max(window_l, window_h))
-
     api_thread = threading.Thread(target=api.auto_update, kwargs={'verbose': True})
     api_thread.setDaemon(True)
 
@@ -113,9 +122,10 @@ def live_mocktrade(params):
 
     LOG.info('creating Bot thread...')
 
-    bot = Bot(api, strategies)
+    bot = Bot(api, strategies, db=db)
     bot_thread = threading.Thread(target=bot.run, kwargs={'delta': 7000000})
     bot_thread.setDaemon(True)
+
     try:
         api_thread.start()
         bot_thread.start()
@@ -133,20 +143,25 @@ def live_mocktrade(params):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-t', action="store_true")
+    parser.add_argument('--list_tests', action="store_true")
     parser.add_argument('-o', action="store_true") 
     parser.add_argument('-f', action="store_true")
     parser.add_argument('-p', action="store_true")
     parser.add_argument('-lm', action="store_true")
 
     parser.add_argument('--ema_params', nargs='+', help="list of parameters with [timestep, window_low, window_high].\nCan be named i.e. [timestep=12, window_low=4]")
-    
+    parser.add_argument('-t', nargs='+', help="list of tests to execute. --list-tests for a list of all avaibale test cases.")
     flags = parser.parse_args()
     params = flags.ema_params
     if params:
-        params = dict([(p.split('=')[0], int(p.split('=')[1])) for p in params])
+        try: 
+            params = dict([(p.split('=')[0], int(p.split('=')[1])) for p in params])
+        except:
+            params = dict(zip(["timestep", "window_low", "window_high"], [int(p) for p in params]))
     if flags.t:
-        test()
+        test(flags.t)
+    elif flags.list_tests:
+        print(tests.keys())
     elif flags.o:
         optimize()
     elif flags.p:

@@ -1,5 +1,6 @@
 import numpy as np
 from itertools import groupby
+import os
 
 def ewma_vectorized(data, alpha, offset=None, dtype=None, order='C', out=None):
     """
@@ -265,6 +266,11 @@ def extend_ema(old, new, window):
     x = new * alpha + old[-1] * (1- alpha)
     return np.append(old, x)
 
+def next_ema(old, new, window):
+    alpha = 2 / (window + 1.0)
+    x = new * alpha + old[-1] * (1- alpha)
+    return x
+
 '''
 lows:np.ndarray = ema of market lows
 highs:np.ndarray = ema of market highs
@@ -306,3 +312,8 @@ def signals(lows, highs, split=None, limit=None):
 def all_equal(iterable):
     g = groupby(iterable)
     return next(g, True) and not next(g, False)
+
+def absoluteFilePaths(directory):
+    for dirpath,_,filenames in os.walk(directory):
+        for f in filenames:
+            yield os.path.abspath(os.path.join(dirpath, f))

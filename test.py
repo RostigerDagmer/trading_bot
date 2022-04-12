@@ -2,6 +2,7 @@ from api import *
 from decimal import Decimal
 from func import ema, signals
 from bot import trade_history, static_trade_history
+from log import Database
 
 def instance_c_market_cap_response():
     data = {'habe': 'dere'}
@@ -13,6 +14,7 @@ def connect_c_market_cap():
     api = CMarketCapAPI(url, API_KEY)
     api('ETH', '1')
     print(api.get_price().json())
+
 # random forest best estimate: timestep=55, w_l=2, w_h=68
 # random forest hf estimate: timestep=10, w_l=3, w_h=17
 # debiased forest best estimate timestep=278, w_l=2657, w_h=88
@@ -124,9 +126,37 @@ def test_signals():
     lows = api.history_lows()
     highs = api.history_highs()
 
+def test_table_creation():
+    db = Database()
+    t = np.dtype([("trades", "S16"), 
+                    ("ema_low", np.float64), 
+                    ("ema_high", np.float64), 
+                    ("capital", np.float64)
+                    ])
+    db.create_table("bot", "readout", t)
+    db.show()
+
+def test_data_write():
+    db = Database()
+    t = np.dtype([("trades", "S16"), 
+                    ("ema_low", np.float64), 
+                    ("ema_high", np.float64), 
+                    ("capital", np.float64)
+                    ])
+    d = {'ema_low': np.array([1,2,3], dtype=float),
+         'ema_high':  np.array([2,3, 4], dtype=float),
+         "capital":  np.array([6,7,8], dtype=float),
+         "trades": np.array(['long', 'short', 'long'])}
+         
+    db.create_table("bot", "readout", t)
+    db.write_data("bot", "readout", d)
+    db.sync()
+    db.show()
 
 tests = {
     #'instance_c_market_cap_response': instance_c_market_cap_response,
     #'mocktrade_history': mocktrade_history,
-    'test_vec_mocktrade': test_vec_mocktrade,
+    'vec_mocktrade': test_vec_mocktrade,
+    'table_creation': test_table_creation,
+    'data_write': test_data_write,
 }

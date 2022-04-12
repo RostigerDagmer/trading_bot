@@ -106,7 +106,7 @@ usleep = lambda x: time.sleep(x/1000000.0)
 
 class Bot:
 
-    def __init__(self, api, strategies, history=None, record=False):
+    def __init__(self, api, strategies, history=None, db=None):
         self.strategies = strategies
         self.api = api
         self.last_update = self.api.last_history_update()
@@ -115,30 +115,35 @@ class Bot:
         self.capital = self.api.funds
         self.open_positions = {}
         self.timezone = tz.tzlocal()
-        '''
-        self.record = record
-        self.data_dir = None
-        self.filename = None
-        if self.record:
-            self.data_dir = self.find_data_dir()
-        '''
-    
-    def find_data_dir(self):
-        cwd = os.getcwd()
-        files = list(absoluteFilePaths(cwd))
-        if not files.contains("tmp"):
-            logging.error("tmp directory not found")
-            logging.error("aborting...")
-            sys.exit(1)
-        data_path = os.path.join(cwd, "tmp")
-        self.data_dir = data_path
-    '''
-    def write_data(self):
-        if not self.data_dir:
-            self.find_data_dir()
-        if not self.filename:
-            self.filename = datetime.now().strftime("%Y_%m_%d_%H-%M-%S") + "_bot_data.log"
-    '''
+        self.database = db
+        self.record_type = np.dtype([("trades", "S16"), 
+                    ("ema_low", np.float64), 
+                    ("ema_high", np.float64), 
+                    ("capital", np.float64)
+                    ])
+
+    def fetch_all_as_db_record(self, strategy):
+        return {'trades': ['None'] * self.ema[strategy]['low'].shape[0], 
+                'ema_low': self.ema[strategy]['low'],
+                'ema_high': self.ema[strategy]['high'],
+                'captial': [float(self.capital)] * self.ema[strategy]['low'].shape[0]}
+
+    def fetch_latest_as_db_record(self, strategy):
+        none_as_str = lambda n: 'None' if not n else str(n)
+        return {'trades': none_as_str(open_positions[strategy]),
+                'ema_low': self.ema[strategy]['low'][-1],
+                'ema_high': self.ema[strategy]['high'][-1],
+                'capital': float(self.capital)}
+
+    def init_db(self):
+        for strategy in self.strategies:
+            self.database.create_table("bot", strategy, self.record_type)
+            self.database.write_data("/bot", f'/{strategy}', self.fetch_all_as_db_record(strategy))
+
+    def write_out(self):
+        for strategy in self.strategies:
+            self.database.write_data('/bot', f'/{strategy}', self.fetch_latest_as_db_record(strategy))
+        self.database.sync()
 
     def init_ema(self):
         for strategy, (timestep, window_low, window_high) in self.strategies.items():
@@ -157,6 +162,7 @@ class Bot:
         return not any([self.ema.get(s) for s in self.strategies]) 
 
     def run(self, delta=100):
+        first = True
         while True:
             tic = time.time()
             usleep(delta)
@@ -164,6 +170,8 @@ class Bot:
             logging.info("running bot thread")
             if self.ema_empty():
                 self.init_ema()
+                if self.database:
+                    self.init_db()
             threads = []
             for strategy, params in self.strategies.items():
                 t = threading.Thread(target=self.run_thread, args=(strategy, params))
@@ -172,6 +180,10 @@ class Bot:
 
             for t in threads:
                 t.join()
+
+            if self.database and not first:
+                self.write_data()
+                first = False
             #####################################
             toc = time.time()
             
@@ -254,36 +266,40 @@ class Bot:
 
     def eval(self, strategy, params):
         timestep, window_low, window_high = params
-        if self.api.history_length() % timestep == 0:
-            low = self.api.history_lows(timestep)[-1]
-            high = self.api.history_highs(timestep)[-1]
+        low = self.api.history_lows(timestep)[-1]
+        high = self.api.history_highs(timestep)[-1]
 
-            self.ema[strategy]['low'] = extend_ema(self.ema[strategy]['low'], low, window_low)
-            self.ema[strategy]['high'] = extend_ema(self.ema[strategy]['high'], high, window_high)
+        # caculate EMAs for right now
+        emal_ = next_ema(self.ema[strategy]['low'], low, window_low)
+        emah_ = next_ema(self.ema[strategy]['high'], high, window_low)
 
-            logging.info(f"new_ema_low: {self.ema[strategy]['low'][-5:]}")
-            logging.info(f"new_ema_high: {self.ema[strategy]['high'][-5:]}")
-
-            if (self.ema[strategy]['low'][-1] > self.ema[strategy]['high'][-1]) and (self.ema[strategy]['low'][-2] <= self.ema[strategy]['high'][-2]):
-                logging.info(f'strategy {strategy} found a signal to go long')
-                try: 
-                    if self.open_positions.get(strategy)[0] == "goshort":
-                        return ("resolve", "golong")
-                except (NameError, AttributeError, TypeError) as e:
-                    logging.info(f'no short position to resolve. Going long')
-                    return ('noop', 'golong')
-            
-            elif (self.ema[strategy]['low'][-1] < self.ema[strategy]['high'][-1]) and (self.ema[strategy]['low'][-2] >= self.ema[strategy]['high'][-2]):
-                logging.info(f'strategy {strategy} found a signal to go short')
-                try:
-                    if self.open_positions.get(strategy)[0] == "golong":
-                        return ("resolve", "goshort")
-                except (NameError, AttributeError, TypeError) as e:
-                    logging.info(f'no long position to resolve. Going short')
-                    return ('noop', 'goshort')
-
-            else:
-                return None
+        if self.api.history_length() % timestep in [0, 1]:
+            self.ema[strategy]['low'] = np.append(self.ema[strategy]['low'], emal_)
+            self.ema[strategy]['high'] = np.append(self.ema[strategy]['high'], emah_)
         else:
-            logging.info(f'next evaluation in: {timestep - (self.api.history_length() % timestep)}min')
+            self.ema[strategy]['low'][-1] = emal_
+            self.ema[strategy]['high'][-1] = emah_
+        
+        logging.info(f"new_ema_low: {self.ema[strategy]['low'][-5:]}")
+        logging.info(f"new_ema_high: {self.ema[strategy]['high'][-5:]}")
+
+        if (self.ema[strategy]['low'][-1] > self.ema[strategy]['high'][-1]) and (self.ema[strategy]['low'][-2] <= self.ema[strategy]['high'][-2]):
+            logging.info(f'strategy {strategy} found a signal to go long')
+            try: 
+                if self.open_positions.get(strategy)[0] == "goshort":
+                    return ("resolve", "golong")
+            except (NameError, AttributeError, TypeError) as e:
+                logging.info(f'no short position to resolve. Going long')
+                return ('noop', 'golong')
+        
+        elif (self.ema[strategy]['low'][-1] < self.ema[strategy]['high'][-1]) and (self.ema[strategy]['low'][-2] >= self.ema[strategy]['high'][-2]):
+            logging.info(f'strategy {strategy} found a signal to go short')
+            try:
+                if self.open_positions.get(strategy)[0] == "golong":
+                    return ("resolve", "goshort")
+            except (NameError, AttributeError, TypeError) as e:
+                logging.info(f'no long position to resolve. Going short')
+                return ('noop', 'goshort')
+
+        else:
             return None

@@ -180,7 +180,8 @@ class FtxAPI(API):
             logging.info('-- everything still up to date --')
             if verbose:
                 self.log_stats()
-
+            return
+            
         response_array = self.client.get_historical_prices( self.currency, 
                                                             resolution=60, 
                                                             start_time=time.mktime(start_time.timetuple()), 
@@ -188,6 +189,7 @@ class FtxAPI(API):
         
         if response_array[-1]['startTime'] == self.history[self.currency]['date'][-1]:
             logging.info('no new info yet')
+            return
 
         for k in ['low', 'high', 'open', 'close']:
             self.history[self.currency][k] = np.append(self.history[self.currency][k], self._wrap_dict_ndarray(response_array, k, float)[-1])
@@ -208,8 +210,23 @@ class FtxAPI(API):
             dw = next_minute - datetime.now() + offset
             self.next_update = next_minute
             time.sleep(dw.total_seconds())
-            self.update(verbose)
-    
+            try:
+                self.update(verbose)
+            except ConnectionError:
+                # retry connection
+                connected = False
+                while not connected:
+                    try: 
+                        self.reconnect()
+                        f = self.client.get_account_info()
+                        connected = True
+                    except:
+                        logging.error('error reconnecting to FTX API... trying again')
+                        time.sleep(1)
+
+    def reconnect():
+        self.client = FtxClient(self.api_key, self.api_secret, self.subaccount_name)
+
     def _wrap_type(self, a, t):
         if isinstance(a, np.ndarray):
             return np.array([t(v) for v in a])
@@ -249,6 +266,9 @@ class FtxAPI(API):
     
     def last_history_update(self):
         return datetime.fromisoformat(self.history[self.currency]['date'][-1])
+    
+    def date_history(self):
+        return [datetime.fromisoformat(c) for c in self.history[self.currency]['date']]
 
     def open_history(self, minute_interval=1, timeframe=None):
         return self._wrap_decimal(self.history[self.currency]['open'][0:timeframe:minute_interval])
