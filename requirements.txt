@@ -8,3 +8,4 @@ mplfinance
 scikit-optimize
 pyswarms
 bokeh
+python-dotenv

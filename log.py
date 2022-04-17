@@ -41,12 +41,13 @@ class Database():
         if not self.file.__contains__("/" + group):
             self.file.create_group("/", group, group + " data")
         self.file.create_table("/" + group, name, t)
+        print(self.file)
 
     def write_data(self, group, table, data):
         t = self.file.get_node("/" + group + "/" + table)
         row = t.row
         for k,v in data.items():
-            if isinstance(v, np.ndarray):
+            if isinstance(v, (np.ndarray, np.generic)):
                 for i in v:
                     row[k] = i
                     row.append()

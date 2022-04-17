@@ -123,14 +123,14 @@ class Bot:
                     ])
 
     def fetch_all_as_db_record(self, strategy):
-        return {'trades': ['None'] * self.ema[strategy]['low'].shape[0], 
+        return {'trades': np.array(['None'] * self.ema[strategy]['low'].shape[0], dtype="S16"),
                 'ema_low': self.ema[strategy]['low'],
                 'ema_high': self.ema[strategy]['high'],
-                'captial': [float(self.capital)] * self.ema[strategy]['low'].shape[0]}
+                'capital': np.array([float(self.capital)] * self.ema[strategy]['low'].shape[0], dtype=float)}
 
     def fetch_latest_as_db_record(self, strategy):
         none_as_str = lambda n: 'None' if not n else str(n)
-        return {'trades': none_as_str(open_positions[strategy]),
+        return {'trades': none_as_str(self.open_positions[strategy]),
                 'ema_low': self.ema[strategy]['low'][-1],
                 'ema_high': self.ema[strategy]['high'][-1],
                 'capital': float(self.capital)}
@@ -138,11 +138,11 @@ class Bot:
     def init_db(self):
         for strategy in self.strategies:
             self.database.create_table("bot", strategy, self.record_type)
-            self.database.write_data("/bot", f'/{strategy}', self.fetch_all_as_db_record(strategy))
+            self.database.write_data("bot", strategy, self.fetch_all_as_db_record(strategy))
 
     def write_out(self):
         for strategy in self.strategies:
-            self.database.write_data('/bot', f'/{strategy}', self.fetch_latest_as_db_record(strategy))
+            self.database.write_data('bot', strategy, self.fetch_latest_as_db_record(strategy))
         self.database.sync()
 
     def init_ema(self):

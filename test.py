@@ -3,6 +3,8 @@ from decimal import Decimal
 from func import ema, signals
 from bot import trade_history, static_trade_history
 from log import Database
+import tables
+import os
 
 def instance_c_market_cap_response():
     data = {'habe': 'dere'}
@@ -153,10 +155,16 @@ def test_data_write():
     db.sync()
     db.show()
 
+def test_data_read():
+    d = os.path.join(os.getcwd(), 'tmp')
+    f = tables.open_file(os.path.join(d, os.listdir(d)[-1]), driver="H5FD_CORE")
+    print(f)
+
 tests = {
     #'instance_c_market_cap_response': instance_c_market_cap_response,
     #'mocktrade_history': mocktrade_history,
     'vec_mocktrade': test_vec_mocktrade,
     'table_creation': test_table_creation,
     'data_write': test_data_write,
+    'data_read' : test_data_read,
 }
