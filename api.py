@@ -172,7 +172,6 @@ class FtxAPI(API):
             logging.info(f'close:  {self.history[self.currency]["close"][-1]}$')
 
     def update(self, verbose=True):
-
         end_time = datetime.now()
         start_time = self.last_history_update().astimezone(self.timezone)
 
@@ -212,7 +211,8 @@ class FtxAPI(API):
             time.sleep(dw.total_seconds())
             try:
                 self.update(verbose)
-            except ConnectionError:
+            except Exception as e:
+                logging.warning(f'An error occured during request to API!\n{e}\nTrying to reconnect')
                 # retry connection
                 connected = False
                 while not connected:
@@ -222,9 +222,11 @@ class FtxAPI(API):
                         connected = True
                     except:
                         logging.error('error reconnecting to FTX API... trying again')
-                        time.sleep(1)
+                        time.sleep(0.5)
+            finally:
+                self.update(verbose)
 
-    def reconnect():
+    def reconnect(self):
         self.client = FtxClient(self.api_key, self.api_secret, self.subaccount_name)
 
     def _wrap_type(self, a, t):

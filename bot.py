@@ -242,7 +242,7 @@ class Bot:
             return self.capital * Decimal(diff)
 
         logging.info('no position to resolve yet...')
-        return capital
+        return self.capital
 
     def open_position(self, strategy, position, capital):
         if self.open_positions.get(strategy):
