@@ -220,11 +220,10 @@ class FtxAPI(API):
                         self.reconnect()
                         f = self.client.get_account_info()
                         connected = True
+                        self.update(verbose)
                     except:
                         logging.error('error reconnecting to FTX API... trying again')
                         time.sleep(0.5)
-            finally:
-                self.update(verbose)
 
     def reconnect(self):
         self.client = FtxClient(self.api_key, self.api_secret, self.subaccount_name)
