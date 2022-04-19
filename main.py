@@ -20,6 +20,7 @@ from log import initLogger, Database
 import logging
 import platform
 import signal
+import sys
 
 API_KEY = '8e26e098-6e2f-4275-818b-6fc64e2c15a0'
 url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest'

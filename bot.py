@@ -271,7 +271,7 @@ class Bot:
 
         # caculate EMAs for right now
         emal_ = next_ema(self.ema[strategy]['low'], low, window_low)
-        emah_ = next_ema(self.ema[strategy]['high'], high, window_low)
+        emah_ = next_ema(self.ema[strategy]['high'], high, window_high)
 
         if self.api.history_length() % timestep in [0, 1]:
             self.ema[strategy]['low'] = np.append(self.ema[strategy]['low'], emal_)
